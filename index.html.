@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CatchUp AI | Your chats, caught up.</title>
+<style>
+:root{--bg:#0b1120;--card:#151f32;--mint:#8df5ce;--muted:#a7b4c8;--white:#f4f7fb}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--white);font-family:Arial,sans-serif;line-height:1.6}
+header{padding:24px 6%;border-bottom:1px solid #27334a;display:flex;align-items:center;gap:12px}
+.logo{background:var(--mint);color:#0b1120;border-radius:12px;padding:8px 12px;font-weight:bold}
+h1{font-size:clamp(30px,5vw,48px);line-height:1.15;margin:0 0 12px}
+h2{font-size:19px;margin:0 0 12px}
+p{color:var(--muted)}
+.hero{max-width:1000px;margin:auto;padding:45px 20px 24px}
+.mint{color:var(--mint)}
+.tag{display:inline-block;border:1px solid #395047;border-radius:30px;padding:5px 12px;color:var(--mint);font-size:13px;margin-bottom:18px}
+.layout{max-width:1000px;margin:auto;padding:0 20px 50px;display:grid;grid-template-columns:1fr 1fr;gap:18px}
+.card{background:var(--card);border:1px solid #29364c;border-radius:16px;padding:22px;min-width:0}
+textarea{width:100%;min-height:260px;resize:vertical;background:#0c1425;color:var(--white);border:1px solid #34425b;border-radius:10px;padding:14px;font:14px/1.7 Arial,sans-serif}
+textarea:focus{outline:2px solid var(--mint)}
+button{cursor:pointer;border:0;border-radius:9px;padding:12px 16px;font-weight:bold;font-size:14px}
+.primary{background:var(--mint);color:#0b1120;flex:1}
+.secondary{background:#27364b;color:white;border:1px solid #43516a}
+.actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}
+.privacy{font-size:12px;margin-top:12px}
+.results{grid-column:1/-1}
+.resultgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.resultbox{background:#0c1425;border:1px solid #29364c;border-radius:12px;padding:15px;min-height:125px}
+.resultbox h3{font-size:14px;margin:0 0 10px}
+.resultbox p,.resultbox li{font-size:13px;overflow-wrap:anywhere}
+ul{padding-left:18px}
+.badge{display:inline-block;border-radius:20px;padding:3px 8px;font-size:11px;margin:3px 3px 3px 0;background:#3b252e;color:#ffb3bd}
+.empty{color:#8796ad;font-size:13px}
+footer{text-align:center;padding:25px;color:#8796ad;font-size:12px;border-top:1px solid #27334a}
+@media(max-width:700px){.layout{grid-template-columns:1fr}.results{grid-column:auto}.resultgrid{grid-template-columns:1fr}.hero{padding-top:30px}header{padding:18px 20px}}
+</style>
+</head>
+<body>
+<header>
+<div class="logo">CU</div>
+<div><strong>CatchUp <span class="mint">AI</span></strong><br><small style="color:#a7b4c8">Your chats, caught up.</small></div>
+</header>
+
+<section class="hero">
+<div class="tag">✦ THE UNREAD PROBLEM</div>
+<h1>Too many messages?<br><span class="mint">Catch up in seconds.</span></h1>
+<p>Paste your unread chat messages. Find what matters, what needs action, and what you might have missed.</p>
+</section>
+
+<main class="layout">
+<section class="card">
+<h2>01 / Your unread messages</h2>
+<p>Paste a conversation below. Remove private information first.</p>
+<textarea id="chat" placeholder="Paste your unread messages here...&#10;&#10;Example: Team meeting moved to 3 PM.&#10;Priya: Please submit the report by tonight.&#10;Alex: The venue is confirmed!"></textarea>
+<div class="actions">
+<button class="primary" id="catch">✦ Catch Me Up</button>
+<button class="secondary" id="sample">Try sample</button>
+<button class="secondary" id="clear">Clear</button>
+</div>
+<p class="privacy">🔒 Privacy first: this prototype processes text in your browser. It does not upload or save your messages.</p>
+</section>
+
+<section class="card">
+<h2>02 / Your catch-up</h2>
+<div id="overview" class="empty">Your summary will appear here after you process messages.</div>
+<div id="counts" style="margin-top:12px"></div>
+</section>
+
+<section class="card results">
+<h2>03 / What did you miss?</h2>
+<p>Review the messages grouped by their likely priority.</p>
+<div class="resultgrid">
+<div class="resultbox"><h3>🔴 Urgent</h3><div id="urgent" class="empty">Nothing identified yet.</div></div>
+<div class="resultbox"><h3>🟡 Important</h3><div id="important" class="empty">Nothing identified yet.</div></div>
+<div class="resultbox"><h3>🔵 Informational</h3><div id="info" class="empty">Nothing identified yet.</div></div>
+</div>
+<p id="disclaimer" class="privacy">Demo mode: categorization uses simple keyword rules, not a real AI model. Always verify deadlines and decisions against the original conversation.</p>
+</section>
+</main>
+
+<footer>CatchUp AI · Hackathon prototype · Built with HTML, CSS & JavaScript</footer>
+
+<script>
+const $ = id => document.getElementById(id);
+
+const sample = `Team: Our project meeting is tomorrow at 10 AM.
+Priya: URGENT — submit the final report before 6 PM today.
+Alex: Can everyone review the slides before the meeting?
+Sam: The venue has been confirmed as Room 204.
+Riya: @everyone please send me your part of the project by 4 PM.
+Team: Thanks everyone!`;
+
+function escapeHTML(text) {
+  return text.replace(/[&<>"']/g, c => ({
+    "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
+  }[c]));
+}
+
+function classify(line) {
+  const s = line.toLowerCase();
+  const urgent = /\burgent\b|\basap\b|\bimmediately\b|\boverdue\b|\bdeadline\b|\bdue\b|\bsubmit\b|\bby (today|tonight|tomorrow)\b|\bwithin \d+ hours?\b|\baction required\b/.test(s);
+  const important = /\bplease\b|\bmeeting\b|\bremind\b|\breminder\b|\bassign(ed|ment)?\b|\btask\b|\baction item\b|\bdecision\b|\bconfirm\b|\breview\b|\bmust\b|\bneed to\b|\bcan everyone\b|\b@\w+/.test(s);
+  return urgent ? "urgent" : important ? "important" : "info";
+}
+
+function renderList(lines, emptyText) {
+  if (!lines.length) return '<p class="empty">' + emptyText + '</p>';
+  return '<ul>' + lines.map(line => '<li>' + escapeHTML(line) + '</li>').join('') + '</ul>';
+}
+
+function processChat() {
+  const raw = $("chat").value.trim();
+  if (!raw) {
+    $("overview").innerHTML = '<p class="empty">Please paste some messages first.</p>';
+    $("counts").textContent = "";
+    return;
+  }
+
+  const lines = raw.split(/\n+/).map(s => s.trim()).filter(Boolean);
+  const groups = {urgent:[], important:[], info:[]};
+  lines.forEach(line => groups[classify(line)].push(line));
+
+  $("overview").innerHTML =
+    '<p>Reviewed <strong>' + lines.length + '</strong> message line(s).</p>' +
+    '<p>Start with urgent items, then check important requests. Read the original conversation to confirm context.</p>';
+
+  $("counts").innerHTML =
+    '<span class="badge">' + groups.urgent.length + ' urgent</span>' +
+    '<span class="badge" style="background:#403820;color:#ffe09b">' + groups.important.length + ' important</span>' +
+    '<span class="badge" style="background:#1c3548;color:#a7ddff">' + groups.info.length + ' informational</span>';
+
+  $("urgent").innerHTML = renderList(groups.urgent, "No urgent keywords detected.");
+  $("important").innerHTML = renderList(groups.important, "No likely action items detected.");
+  $("info").innerHTML = renderList(groups.info, "No informational messages.");
+  $("disclaimer").textContent =
+    "Simulated analysis using local keyword rules — not real AI. Rules can misclassify messages. Check the original chat for context, mentions and deadlines.";
+}
+
+$("catch").addEventListener("click", processChat);
+$("sample").addEventListener("click", () => {
+  $("chat").value = sample;
+  processChat();
+});
+$("clear").addEventListener("click", () => {
+  $("chat").value = "";
+  $("overview").innerHTML = '<p class="empty">Your summary will appear here after you process messages.</p>';
+  $("counts").textContent = "";
+  ["urgent","important","info"].forEach(id => {
+    $(id).innerHTML = '<p class="empty">Nothing identified yet.</p>';
+  });
+  $("disclaimer").textContent =
+    "Demo mode: categorization uses simple keyword rules, not a real AI model. Always verify deadlines and decisions against the original conversation.";
+});
+</script>
+</body>
+</html>
