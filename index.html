@@ -94,62 +94,108 @@ Team: Thanks everyone!`;
 
 function escapeHTML(text) {
   return text.replace(/[&<>"']/g, c => ({
-    "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
+    "&": "&amp;", "<": "&lt;", ">": "&gt;",
+    '"': "&quot;", "'": "&#39;"
   }[c]));
 }
 
 function classify(line) {
   const s = line.toLowerCase();
-  const urgent = /\burgent\b|\basap\b|\bimmediately\b|\boverdue\b|\bdeadline\b|\bdue\b|\bsubmit\b|\bby (today|tonight|tomorrow)\b|\bwithin \d+ hours?\b|\baction required\b/.test(s);
-  const important = /\bplease\b|\bmeeting\b|\bremind\b|\breminder\b|\bassign(ed|ment)?\b|\btask\b|\baction item\b|\bdecision\b|\bconfirm\b|\breview\b|\bmust\b|\bneed to\b|\bcan everyone\b|\b@\w+/.test(s);
+
+  const urgent =
+    /\burgent\b|\basap\b|\bimmediately\b|\boverdue\b|\bdeadline\b|\bdue\b|\bsubmit\b|\bby (today|tonight|tomorrow)\b|\bbefore \d|\bby \d|\bwithin \d+ hours?\b|\baction required\b|\blast call\b/.test(s);
+
+  const important =
+    /\bplease\b|\bmeeting\b|\bremind(er)?\b|\bassign(ed|ment)?\b|\btask\b|\baction item\b|\bdecision\b|\bconfirm(ed|ation)?\b|\breview\b|\bmust\b|\bneed to\b|\bcan everyone\b|@\w+|\?/.test(s);
+
   return urgent ? "urgent" : important ? "important" : "info";
 }
 
 function renderList(lines, emptyText) {
-  if (!lines.length) return '<p class="empty">' + emptyText + '</p>';
-  return '<ul>' + lines.map(line => '<li>' + escapeHTML(line) + '</li>').join('') + '</ul>';
+  if (!lines.length) {
+    return '<p class="empty">' + emptyText + '</p>';
+  }
+  return '<ul>' + lines.map(line =>
+    '<li>' + escapeHTML(line) + '</li>'
+  ).join('') + '</ul>';
 }
 
 function processChat() {
   const raw = $("chat").value.trim();
+
   if (!raw) {
-    $("overview").innerHTML = '<p class="empty">Please paste some messages first.</p>';
+    $("overview").textContent = "Please paste some messages first.";
     $("counts").textContent = "";
     return;
   }
 
-  const lines = raw.split(/\n+/).map(s => s.trim()).filter(Boolean);
-  const groups = {urgent:[], important:[], info:[]};
-  lines.forEach(line => groups[classify(line)].push(line));
+  // Protect the browser from unnecessarily large pasted input.
+  if (raw.length > 20000) {
+    $("overview").textContent =
+      "This demo accepts up to 20,000 characters at a time. Please paste a shorter conversation.";
+    $("counts").textContent = "";
+    return;
+  }
+
+  const lines = raw.split(/\n+/)
+    .map(line => line.trim())
+    .filter(Boolean);
+
+  const groups = { urgent: [], important: [], info: [] };
+
+  lines.forEach(line => {
+    groups[classify(line)].push(line);
+  });
+
+  const actions = [...groups.urgent, ...groups.important];
 
   $("overview").innerHTML =
-    '<p>Reviewed <strong>' + lines.length + '</strong> message line(s).</p>' +
-    '<p>Start with urgent items, then check important requests. Read the original conversation to confirm context.</p>';
+    '<p>Reviewed <strong>' + lines.length +
+    '</strong> message line(s).</p>' +
+    '<p><strong>Recommended next steps</strong></p>' +
+    (actions.length
+      ? '<ul>' + actions.slice(0, 3).map(line =>
+          '<li>' + escapeHTML(line) + '</li>'
+        ).join('') + '</ul>'
+      : '<p class="empty">No likely action items detected. Check the full conversation.</p>') +
+    '<p class="privacy">These are keyword-based suggestions, not verified conclusions.</p>';
 
   $("counts").innerHTML =
     '<span class="badge">' + groups.urgent.length + ' urgent</span>' +
-    '<span class="badge" style="background:#403820;color:#ffe09b">' + groups.important.length + ' important</span>' +
-    '<span class="badge" style="background:#1c3548;color:#a7ddff">' + groups.info.length + ' informational</span>';
+    '<span class="badge" style="background:#403820;color:#ffe09b">' +
+    groups.important.length + ' important</span>' +
+    '<span class="badge" style="background:#1c3548;color:#a7ddff">' +
+    groups.info.length + ' informational</span>';
 
-  $("urgent").innerHTML = renderList(groups.urgent, "No urgent keywords detected.");
-  $("important").innerHTML = renderList(groups.important, "No likely action items detected.");
-  $("info").innerHTML = renderList(groups.info, "No informational messages.");
+  $("urgent").innerHTML =
+    renderList(groups.urgent, "No urgent keywords detected.");
+  $("important").innerHTML =
+    renderList(groups.important, "No likely action items detected.");
+  $("info").innerHTML =
+    renderList(groups.info, "No informational messages.");
+
   $("disclaimer").textContent =
-    "Simulated analysis using local keyword rules — not real AI. Rules can misclassify messages. Check the original chat for context, mentions and deadlines.";
+    "Local keyword-based analysis, not genuine AI. Items may be misclassified. Verify deadlines, decisions and responsibilities against the original chat.";
 }
 
 $("catch").addEventListener("click", processChat);
+
 $("sample").addEventListener("click", () => {
   $("chat").value = sample;
   processChat();
 });
+
 $("clear").addEventListener("click", () => {
   $("chat").value = "";
-  $("overview").innerHTML = '<p class="empty">Your summary will appear here after you process messages.</p>';
+  $("overview").textContent =
+    "Your summary will appear here after you process messages.";
   $("counts").textContent = "";
-  ["urgent","important","info"].forEach(id => {
-    $(id).innerHTML = '<p class="empty">Nothing identified yet.</p>';
+
+  ["urgent", "important", "info"].forEach(id => {
+    $(id).innerHTML =
+      '<p class="empty">Nothing identified yet.</p>';
   });
+
   $("disclaimer").textContent =
     "Demo mode: categorization uses simple keyword rules, not a real AI model. Always verify deadlines and decisions against the original conversation.";
 });
